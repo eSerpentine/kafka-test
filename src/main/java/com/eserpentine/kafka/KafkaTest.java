@@ -1,6 +1,7 @@
 package com.eserpentine.kafka;
 
 
+import com.eserpentine.kafka.utils.CommonUtils;
 import kafka.admin.AdminUtils;
 import kafka.admin.RackAwareMode;
 import kafka.utils.ZKStringSerializer$;
@@ -13,11 +14,13 @@ import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerRecord;
 
-import javax.sound.midi.Soundbank;
 import java.time.Duration;
 import java.util.Collections;
 import java.util.Properties;
 import java.util.concurrent.TimeUnit;
+
+import static com.eserpentine.kafka.utils.CommonUtils.*;
+import static com.eserpentine.kafka.utils.CommonUtils.waitBeforeSend;
 
 public class KafkaTest {
 
@@ -53,8 +56,6 @@ public class KafkaTest {
         producer("producer1");
         consumer("consumer1");
         consumer("consumer2");
-
-
     }
 
     private static void producer(String producerName) {
@@ -67,17 +68,13 @@ public class KafkaTest {
             properties.put("acks", "0");
 
             KafkaProducer<String, String> producer = new KafkaProducer<>(properties);
+
             int i = 0;
             while (true) {
-                try {
-                    TimeUnit.SECONDS.sleep(2);
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                }
-                ProducerRecord<String, String> record = new ProducerRecord<>(MY_TOPIC_1, null,  String.valueOf(i));
+                waitBeforeSend(2);
+                ProducerRecord<String, String> record = new ProducerRecord<>(MY_TOPIC_1, null,  String.valueOf(++i));
                 producer.send(record);
                 System.out.println("Producer: " + producerName + " send message");
-                ++i;
             }
         });
     }
@@ -90,20 +87,17 @@ public class KafkaTest {
             properties.put("key.deserializer", "org.apache.kafka.common.serialization.StringDeserializer");
             properties.put("value.deserializer", "org.apache.kafka.common.serialization.StringDeserializer");
             properties.put("group.id", "my-topic");
-            KafkaConsumer<String, String> stringStringKafkaConsumer = new KafkaConsumer<String, String>(properties);
-            stringStringKafkaConsumer.subscribe(Collections.singletonList(MY_TOPIC_1));
-            while (true) {
 
-                ConsumerRecords<String, String> polls = stringStringKafkaConsumer.poll(Duration.ofSeconds(2));
+            KafkaConsumer<String, String> consumer = new KafkaConsumer<>(properties);
+            consumer.subscribe(Collections.singletonList(MY_TOPIC_1));
+
+            while (true) {
+                ConsumerRecords<String, String> polls = consumer.poll(Duration.ofSeconds(2));
                 for (ConsumerRecord<String, String> poll : polls) {
                     System.out.println("Consumer: " + name + ": " + poll.key());
                     System.out.println("Consumer: " + name + ": " + poll.value());
                 }
             }
         });
-    }
-
-    private static void threadStart(Runnable runnable) {
-        new Thread(runnable).start();
     }
 }
