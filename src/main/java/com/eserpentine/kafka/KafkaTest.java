@@ -23,9 +23,10 @@ public class KafkaTest {
 
     public static final String MY_TOPIC_1 = "my-topic3";
     public static final String KAFKA_SERVER = "localhost:9092";
+    public static final String ZOOKEEPER_CONNECT = "localhost:2181";
 
-    public static void setup() {
-        String zookeeperConnect = "localhost:2181";
+    private static void setup() {
+        String zookeeperConnect = ZOOKEEPER_CONNECT;
         int sessionTimeoutMs = 10 * 1000;
         int connectionTimeoutMs = 8 * 1000;
 
@@ -34,17 +35,12 @@ public class KafkaTest {
         int replication = 2;
         Properties topicConfig = new Properties(); // add per-topic configurations settings here
 
-        // Note: You must initialize the ZkClient with ZKStringSerializer.  If you don't, then
-        // createTopic() will only seem to work (it will return without error).  The topic will exist in
-        // only ZooKeeper and will be returned when listing topics, but Kafka itself does not create the
-        // topic.
         ZkClient zkClient = new ZkClient(
                 zookeeperConnect,
                 sessionTimeoutMs,
                 connectionTimeoutMs,
                 ZKStringSerializer$.MODULE$);
 
-        // Security for Kafka was added in Kafka 0.9.0.0
         boolean isSecureKafkaCluster = false;
 
         ZkUtils zkUtils = new ZkUtils(zkClient, new ZkConnection(zookeeperConnect), isSecureKafkaCluster);
@@ -62,7 +58,7 @@ public class KafkaTest {
     }
 
     private static void producer(String producerName) {
-        new Thread(() -> {
+        threadStart(() -> {
 
             Properties properties = new Properties();
             properties.put("bootstrap.servers", KAFKA_SERVER);
@@ -83,11 +79,11 @@ public class KafkaTest {
                 System.out.println("Producer: " + producerName + " send message");
                 ++i;
             }
-        }).start();
+        });
     }
 
     private static void consumer(String name) {
-        new Thread(() -> {
+        threadStart(() -> {
 
             Properties properties = new Properties();
             properties.put("bootstrap.servers", KAFKA_SERVER);
@@ -104,6 +100,10 @@ public class KafkaTest {
                     System.out.println("Consumer: " + name + ": " + poll.value());
                 }
             }
-        }).start();
+        });
+    }
+
+    private static void threadStart(Runnable runnable) {
+        new Thread(runnable).start();
     }
 }
