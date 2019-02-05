@@ -13,6 +13,7 @@ import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerRecord;
 
+import javax.sound.midi.Soundbank;
 import java.time.Duration;
 import java.util.Collections;
 import java.util.Properties;
@@ -53,6 +54,14 @@ public class KafkaTest {
 
     public static void main(String[] args) {
         setup();
+        producer("producer1");
+        consumer("consumer1");
+        consumer("consumer2");
+
+
+    }
+
+    private static void producer(String producerName) {
         new Thread(() -> {
 
             Properties properties = new Properties();
@@ -71,14 +80,10 @@ public class KafkaTest {
                 }
                 ProducerRecord<String, String> record = new ProducerRecord<>(MY_TOPIC_1, null,  String.valueOf(i));
                 producer.send(record);
+                System.out.println("Producer: " + producerName + " send message");
                 ++i;
             }
         }).start();
-
-        consumer("consumer1");
-        consumer("consumer2");
-
-
     }
 
     private static void consumer(String name) {
