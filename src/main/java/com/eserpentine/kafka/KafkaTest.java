@@ -1,13 +1,7 @@
 package com.eserpentine.kafka;
 
 
-import com.eserpentine.kafka.utils.CommonUtils;
-import kafka.admin.AdminUtils;
-import kafka.admin.RackAwareMode;
-import kafka.utils.ZKStringSerializer$;
-import kafka.utils.ZkUtils;
-import org.I0Itec.zkclient.ZkClient;
-import org.I0Itec.zkclient.ZkConnection;
+import org.apache.kafka.clients.admin.*;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
@@ -15,47 +9,33 @@ import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerRecord;
 
 import java.time.Duration;
-import java.util.Collections;
-import java.util.Properties;
-import java.util.concurrent.TimeUnit;
+import java.util.*;
 
 import static com.eserpentine.kafka.utils.CommonUtils.*;
 import static com.eserpentine.kafka.utils.CommonUtils.waitBeforeSend;
 
 public class KafkaTest {
 
-    public static final String MY_TOPIC_1 = "my-topic3";
+    public static final String TOPIC = "my-topic5";
     public static final String KAFKA_SERVER = "localhost:9092";
-    public static final String ZOOKEEPER_CONNECT = "localhost:2181";
 
-    private static void setup() {
-        String zookeeperConnect = ZOOKEEPER_CONNECT;
-        int sessionTimeoutMs = 10 * 1000;
-        int connectionTimeoutMs = 8 * 1000;
+    private static void correctSetup() {
+        Properties topicConfig = new Properties();
+        topicConfig.put("bootstrap.servers", KAFKA_SERVER);
 
-        String topic = MY_TOPIC_1;
-        int partitions = 2;
-        int replication = 2;
-        Properties topicConfig = new Properties(); // add per-topic configurations settings here
+        short partitions = 2;
+        short replication = 3;
 
-        ZkClient zkClient = new ZkClient(
-                zookeeperConnect,
-                sessionTimeoutMs,
-                connectionTimeoutMs,
-                ZKStringSerializer$.MODULE$);
-
-        boolean isSecureKafkaCluster = false;
-
-        ZkUtils zkUtils = new ZkUtils(zkClient, new ZkConnection(zookeeperConnect), isSecureKafkaCluster);
-        AdminUtils.createTopic(zkUtils, topic, partitions, replication, topicConfig, RackAwareMode.Enforced$.MODULE$);
-        zkClient.close();
+        AdminClient client = AdminClient.create(topicConfig);
+        client.createTopics(Collections.singletonList(new NewTopic(TOPIC, partitions, replication)));
+        client.describeTopics(Collections.singleton(TOPIC));
     }
 
     public static void main(String[] args) {
-        setup();
+        correctSetup();
         producer("producer1");
-        consumer("consumer1");
-        consumer("consumer2");
+        consumer("consumer1", "group1");
+        consumer("consumer2", "group1");
     }
 
     private static void producer(String producerName) {
@@ -65,31 +45,31 @@ public class KafkaTest {
             properties.put("bootstrap.servers", KAFKA_SERVER);
             properties.put("key.serializer", "org.apache.kafka.common.serialization.StringSerializer");
             properties.put("value.serializer", "org.apache.kafka.common.serialization.StringSerializer");
-            properties.put("acks", "0");
+            properties.put("acks", "-1");
 
             KafkaProducer<String, String> producer = new KafkaProducer<>(properties);
 
             int i = 0;
             while (true) {
                 waitBeforeSend(2);
-                ProducerRecord<String, String> record = new ProducerRecord<>(MY_TOPIC_1, null,  String.valueOf(++i));
+                ProducerRecord<String, String> record = new ProducerRecord<>(TOPIC, null,  String.valueOf(++i));
                 producer.send(record);
                 System.out.println("Producer: " + producerName + " send message");
             }
         });
     }
 
-    private static void consumer(String name) {
+    private static void consumer(String name, String consumerGroup) {
         threadStart(() -> {
 
             Properties properties = new Properties();
             properties.put("bootstrap.servers", KAFKA_SERVER);
             properties.put("key.deserializer", "org.apache.kafka.common.serialization.StringDeserializer");
             properties.put("value.deserializer", "org.apache.kafka.common.serialization.StringDeserializer");
-            properties.put("group.id", "my-topic");
+            properties.put("group.id", consumerGroup);
 
             KafkaConsumer<String, String> consumer = new KafkaConsumer<>(properties);
-            consumer.subscribe(Collections.singletonList(MY_TOPIC_1));
+            consumer.subscribe(Collections.singletonList(TOPIC));
 
             while (true) {
                 ConsumerRecords<String, String> polls = consumer.poll(Duration.ofSeconds(2));
